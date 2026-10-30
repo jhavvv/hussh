@@ -1,0 +1,19 @@
+{
+  "dataset": "16 synthetic holdout examples; no real-world validity claim",
+  "classifier": "TF-IDF logistic regression; threshold 0.5",
+  "precision": 1.0,
+  "recall": 1.0,
+  "f1": 1.0,
+  "confusion_matrix": [
+    [
+      8,
+      0
+    ],
+    [
+      0,
+      8
+    ]
+  ],
+  "median_local_classifier_ms": 0.3406975000643797,
+  "not_measured": "Device OCR latency, mobile build, real network median, independent real-world corpus"
+}

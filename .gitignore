@@ -1,0 +1,57 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Python cache and testing
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Local databases
+*.db
+*.db-journal
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.apk
+*.aab
+
+# Android
+local.properties
+key.properties
+*.keystore
+*.jks
+
+# iOS
+Pods/
+.symlinks/
+
+# IDE settings
+.vscode/
+.idea/
+*.iml
+
+# Node.js
+node_modules/
+dist/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
