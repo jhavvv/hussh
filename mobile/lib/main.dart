@@ -2,64 +2,674 @@ import 'package:flutter/material.dart';
 import 'repositories.dart';
 import 'view_model.dart';
 
-const teal=Color(0xff147b69);
+const lavender = Color(0xFF9872C3);
+const lightPurple = Color(0xFFF8F5FF);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  const url=String.fromEnvironment('API_BASE_URL',defaultValue:'http://10.0.2.2:8000/api');
-  final api=ApiRepository(url);await api.restore();
-  runApp(HuSShApp(api:api));
+  const url = String.fromEnvironment('API_BASE_URL',
+      defaultValue: 'http://10.0.2.2:8000/api');
+  final api = ApiRepository(url);
+  await api.restore();
+  runApp(HuSShApp(api: api));
 }
+
 class HuSShApp extends StatelessWidget {
   final ApiRepository api;
-  const HuSShApp({super.key,required this.api});
-  @override Widget build(BuildContext context)=>MaterialApp(title:'huSSh',debugShowCheckedModeBanner:false,theme:ThemeData(useMaterial3:true,colorScheme:ColorScheme.fromSeed(seedColor:teal),scaffoldBackgroundColor:const Color(0xfff6f8f5),inputDecorationTheme:const InputDecorationTheme(border:OutlineInputBorder(),filled:true,fillColor:Colors.white)),home:Workspace(api:api));
+  const HuSShApp({super.key, required this.api});
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+      title: 'huSSh',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: lavender,
+          ),
+          scaffoldBackgroundColor: lightPurple,
+          inputDecorationTheme: const InputDecorationTheme(
+              border: OutlineInputBorder(),
+              filled: true,
+              fillColor: Colors.white)),
+      home: Workspace(api: api));
 }
+
 class Workspace extends StatefulWidget {
   final ApiRepository api;
-  const Workspace({super.key,required this.api});
-  @override State<Workspace> createState()=>_WorkspaceState();
+  const Workspace({super.key, required this.api});
+  @override
+  State<Workspace> createState() => _WorkspaceState();
 }
+
 class _WorkspaceState extends State<Workspace> {
-  int page=0;
-  final text=TextEditingController(),search=TextEditingController();
-  final history=LocalHistoryRepository();
+  int page = 0;
+  final text = TextEditingController(), search = TextEditingController();
+  final history = LocalHistoryRepository();
   late final SubmitMessageViewModel vm;
-  bool save=false;
-  @override void initState(){super.initState();vm=SubmitMessageViewModel(AnalyzeMessageUseCase(widget.api),DeviceOCRRepository(),history);vm.addListener(changed);}
-  void changed(){if(mounted)setState((){});}
-  @override void dispose(){vm.removeListener(changed);vm.dispose();text.dispose();search.dispose();super.dispose();}
-  void notify(String value){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(value)));}
-  Future<void> run(Future<void> Function() fn) async {try{await fn();if(mounted)setState((){});}catch(e){notify(e.toString());}}
-  Widget panel(String title,Widget body)=>Card(margin:const EdgeInsets.only(bottom:16),color:Colors.white,child:Padding(padding:const EdgeInsets.all(20),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(title,style:Theme.of(context).textTheme.titleMedium),const SizedBox(height:12),body])));
-  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Row(children:[Icon(Icons.shield_outlined,color:teal),SizedBox(width:9),Text('huSSh')]),actions:[IconButton(tooltip:'Account',onPressed:account,icon:const Icon(Icons.account_circle_outlined))]),body:SafeArea(child:Center(child:ConstrainedBox(constraints:const BoxConstraints(maxWidth:760),child:Padding(padding:const EdgeInsets.all(20),child:[check,feed,saved,review][page]())))),bottomNavigationBar:NavigationBar(selectedIndex:page,onDestinationSelected:(v)=>setState(()=>page=v),destinations:const[NavigationDestination(icon:Icon(Icons.fact_check_outlined),label:'Check'),NavigationDestination(icon:Icon(Icons.people_outline),label:'Community'),NavigationDestination(icon:Icon(Icons.history),label:'History'),NavigationDestination(icon:Icon(Icons.verified_user_outlined),label:'Review')]));
-  Widget check(){if(vm.result!=null)return resultView(vm.result!);return ListView(children:[Text('Something feel off? Check it.',style:Theme.of(context).textTheme.headlineMedium),const SizedBox(height:10),const Text('A risk estimate, not a verdict. You choose what to share.'),const SizedBox(height:24),panel('Check a message',Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[OutlinedButton.icon(onPressed:vm.busy?null:()async{final extracted=await vm.readImage();if(extracted!=null){text.text=extracted;notify('Review and correct the extracted text before analysing.');}},icon:const Icon(Icons.image_outlined),label:const Text('Choose screenshot · on-device OCR')),const SizedBox(height:16),TextField(controller:text,minLines:6,maxLines:12,maxLength:10000,decoration:const InputDecoration(labelText:'Message content',hintText:'Paste a suspicious message or review the extracted text')),CheckboxListTile(contentPadding:EdgeInsets.zero,title:const Text('Save this analysis on my device'),value:save,onChanged:vm.busy?null:(v)=>setState(()=>save=v??false)),if(vm.error!=null)Text(vm.error!,style:const TextStyle(color:Colors.red)),if(vm.busy)const LinearProgressIndicator(),const SizedBox(height:16),FilledButton.icon(onPressed:vm.busy?null:()=>vm.submit(text.text,save),icon:const Icon(Icons.search),label:Text(vm.busy?'Checking…':'Analyse message'))])),panel('Your privacy',const Text('Only confirmed text goes to your backend. Screenshots are processed locally. No analysis is retained by the server. History is optional and stored on this device; public reports are separate.')),TextButton(onPressed:(){text.text='Urgent: your bank account is suspended. Verify your password at https://bank-secure.example immediately.';},child:const Text('Try an illustrative scam message'))]);}
-  Widget resultView(Json r){final matches=List<Json>.from((r['matches'] as List).map((m)=>Map<String,dynamic>.from(m)));return ListView(children:[Text('${r['risk']} estimated risk',style:Theme.of(context).textTheme.headlineMedium),const SizedBox(height:8),const Text('Unverified · No result guarantees safety.'),const SizedBox(height:24),panel('1 · Classifier evidence',Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('${r['model']}'),const SizedBox(height:12),...((r['cues'] as List).map((c)=>Text('• $c'))),Text('Risk index: ${r['score']}/100. Not a calibrated probability.')])),panel('2 · Historical evidence',Column(children:[Text(matches.isEmpty?'No matches. Absence from the dataset is not evidence of safety.':'Related reports are supporting evidence, not proof.'),...matches.map((m)=>ListTile(title:Text(m['title']),subtitle:Text(m['match_type']??'Related report'),onTap:()=>openReport(m['id'])))])),panel('3 · Community evidence',Text('${matches.fold<int>(0,(n,m)=>n+(m['count'] as num).toInt())} report receipts across similar threads. This is not a unique-person count across threads. Community activity cannot verify a report.')),panel('4 · Trusted verification',const Text('This message has not been verified. A decision on a related report applies only to that report.')),panel('Indicators',Column(crossAxisAlignment:CrossAxisAlignment.start,children:(r['indicators'] as Map).entries.map((e)=>Text('${e.key}: ${(e.value as List).isEmpty?'None detected':(e.value as List).join(', ')}')).toList())),panel('Next step',const Text('Avoid replying or using message links. Check independently using an organisation’s official app or known contact details.')),OutlinedButton(onPressed:()=>run(()async{await history.save(r);notify('Saved on this device.');}),child:const Text('Save analysis')),OutlinedButton(onPressed:()=>publish(r['text']),child:const Text('Create redacted report')),FilledButton(onPressed:(){vm.clear();text.clear();},child:const Text('Check another message'))]);}
-  Widget asyncList(Future<List<Json>> future,Widget Function(List<Json>) builder)=>FutureBuilder<List<Json>>(future:future,builder:(c,s){if(s.hasError)return Center(child:Column(mainAxisSize:MainAxisSize.min,children:[Text('Unable to load: ${s.error}'),TextButton(onPressed:()=>setState((){}),child:const Text('Try again'))]));if(!s.hasData)return const Center(child:CircularProgressIndicator());return builder(s.data!);});
-  Widget feed()=>Column(children:[TextField(controller:search,decoration:const InputDecoration(labelText:'Search reports',prefixIcon:Icon(Icons.search)),onSubmitted:(_)=>setState((){})),const SizedBox(height:12),Row(children:[const Expanded(child:Text('Community evidence is not verification.')),IconButton(tooltip:'Refresh',onPressed:()=>setState((){}),icon:const Icon(Icons.refresh)),IconButton(tooltip:'New report',onPressed:()=>publish(''),icon:const Icon(Icons.add))]),Expanded(child:asyncList(widget.api.reports(query:search.text),(rows)=>rows.isEmpty?const Center(child:Text('No reports found.')):ListView(children:rows.map((r)=>Card(child:ListTile(title:Text(r['title']),subtitle:Text('${r['category']} · ${r['count']} reports\n${r['sample']==true?'Illustrative sample · ':''}${r['verification']}'),trailing:const Icon(Icons.chevron_right),onTap:()=>openReport(r['id'])))).toList())))]);
-  Widget saved()=>asyncList(history.load(),(rows)=>rows.isEmpty?const Center(child:Text('No saved analyses. Saving is optional.')):ListView(children:rows.map((r)=>Card(child:ListTile(title:Text('${r['risk']} risk'),subtitle:Text(r['text'],maxLines:2,overflow:TextOverflow.ellipsis),onTap:()=>setState((){vm.result=r;page=0;}),trailing:IconButton(tooltip:'Delete saved analysis',icon:const Icon(Icons.delete_outline),onPressed:()=>run(()async{await history.delete(r['id']);}))))).toList()));
-  Widget review(){if(widget.api.account?['role']!='reviewer')return ListView(children:[panel('Reviewer access required',const Text('Only an authorised reviewer can issue a verified decision. An operator must provision this role on the server. Community votes do not grant access.')),FilledButton(onPressed:account,child:const Text('Account'))]);return asyncList(widget.api.request('/review').then((v)=>(v as List).map((r)=>Map<String,dynamic>.from(r)).toList()),(rows)=>rows.isEmpty?const Center(child:Text('No reports awaiting review.')):ListView(children:rows.map((r)=>Card(child:ListTile(title:Text(r['title']),subtitle:Text(r['text'],maxLines:3),onTap:()=>reviewReport(r)))).toList()));}
+  bool save = false;
+  @override
+  void initState() {
+    super.initState();
+    vm = SubmitMessageViewModel(
+        AnalyzeMessageUseCase(widget.api), DeviceOCRRepository(), history);
+    vm.addListener(changed);
+  }
+
+  void changed() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    vm.removeListener(changed);
+    vm.dispose();
+    text.dispose();
+    search.dispose();
+    super.dispose();
+  }
+
+  void notify(String value) {
+    if (mounted)
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(value)));
+  }
+
+  Future<void> run(Future<void> Function() fn) async {
+    try {
+      await fn();
+      if (mounted) setState(() {});
+    } catch (e) {
+      notify(e.toString());
+    }
+  }
+
+  Widget panel(String title, Widget body) => Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      color: Colors.white,
+      child: Padding(
+          padding: const EdgeInsets.all(20),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            body
+          ])));
+  @override
+  Widget build(BuildContext context) => Scaffold(
+      appBar: AppBar(
+          title: Row(
+            children: [
+              Image.asset(
+                'assets/images/hussh_logo.png',
+                width: 48,
+                height: 42,
+              ),
+              const SizedBox(width: 9),
+              const Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'hu',
+                      style: TextStyle(color: Color(0xFF785898)),
+                    ),
+                    TextSpan(
+                      text: 'SS',
+                      style: TextStyle(
+                        color: Color(0xFF4B286D),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'h',
+                      style: TextStyle(color: Color(0xFF785898)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            IconButton(
+                tooltip: 'Account',
+                onPressed: account,
+                icon: const Icon(Icons.account_circle_outlined))
+          ]),
+      body: SafeArea(
+          child: Center(
+              child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: [check, feed, saved, review][page]())))),
+      bottomNavigationBar: NavigationBar(
+          selectedIndex: page,
+          onDestinationSelected: (v) => setState(() => page = v),
+          destinations: const [
+            NavigationDestination(
+                icon: Icon(Icons.fact_check_outlined), label: 'Check'),
+            NavigationDestination(
+                icon: Icon(Icons.people_outline), label: 'Community'),
+            NavigationDestination(icon: Icon(Icons.history), label: 'History'),
+            NavigationDestination(
+                icon: Icon(Icons.verified_user_outlined), label: 'Review')
+          ]));
+  Widget check() {
+    if (vm.result != null) return resultView(vm.result!);
+    return ListView(children: [
+      Text('Something feel off? Check it.',
+          style: Theme.of(context).textTheme.headlineMedium),
+      const SizedBox(height: 10),
+      const Text('A risk estimate, not a verdict. You choose what to share.'),
+      const SizedBox(height: 24),
+      panel(
+          'Check a message',
+          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            OutlinedButton.icon(
+                onPressed: vm.busy
+                    ? null
+                    : () async {
+                        final extracted = await vm.readImage();
+                        if (extracted != null) {
+                          text.text = extracted;
+                          notify(
+                              'Review and correct the extracted text before analysing.');
+                        }
+                      },
+                icon: const Icon(Icons.image_outlined),
+                label: const Text('Choose screenshot · on-device OCR')),
+            const SizedBox(height: 16),
+            TextField(
+                controller: text,
+                minLines: 6,
+                maxLines: 12,
+                maxLength: 10000,
+                decoration: const InputDecoration(
+                    labelText: 'Message content',
+                    hintText:
+                        'Paste a suspicious message or review the extracted text')),
+            CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Save this analysis on my device'),
+                value: save,
+                onChanged:
+                    vm.busy ? null : (v) => setState(() => save = v ?? false)),
+            if (vm.error != null)
+              Text(vm.error!, style: const TextStyle(color: Colors.red)),
+            if (vm.busy) const LinearProgressIndicator(),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+                onPressed: vm.busy ? null : () => vm.submit(text.text, save),
+                icon: const Icon(Icons.search),
+                label: Text(vm.busy ? 'Checking…' : 'Analyse message'))
+          ])),
+      panel(
+          'Your privacy',
+          const Text(
+              'Only confirmed text goes to your backend. Screenshots are processed locally. No analysis is retained by the server. History is optional and stored on this device; public reports are separate.')),
+      TextButton(
+          onPressed: () {
+            text.text =
+                'Urgent: your bank account is suspended. Verify your password at https://bank-secure.example immediately.';
+          },
+          child: const Text('Try an illustrative scam message'))
+    ]);
+  }
+
+  Widget resultView(Json r) {
+    final matches = List<Json>.from(
+        (r['matches'] as List).map((m) => Map<String, dynamic>.from(m)));
+    return ListView(children: [
+      Text('${r['risk']} estimated risk',
+          style: Theme.of(context).textTheme.headlineMedium),
+      const SizedBox(height: 8),
+      const Text('Unverified · No result guarantees safety.'),
+      const SizedBox(height: 24),
+      panel(
+          '1 · Classifier evidence',
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${r['model']}'),
+            const SizedBox(height: 12),
+            ...((r['cues'] as List).map((c) => Text('• $c'))),
+            Text('Risk index: ${r['score']}/100. Not a calibrated probability.')
+          ])),
+      panel(
+          '2 · Historical evidence',
+          Column(children: [
+            Text(matches.isEmpty
+                ? 'No matches. Absence from the dataset is not evidence of safety.'
+                : 'Related reports are supporting evidence, not proof.'),
+            ...matches.map((m) => ListTile(
+                title: Text(m['title']),
+                subtitle: Text(m['match_type'] ?? 'Related report'),
+                onTap: () => openReport(m['id'])))
+          ])),
+      panel(
+          '3 · Community evidence',
+          Text(
+              '${matches.fold<int>(0, (n, m) => n + (m['count'] as num).toInt())} report receipts across similar threads. This is not a unique-person count across threads. Community activity cannot verify a report.')),
+      panel(
+          '4 · Trusted verification',
+          const Text(
+              'This message has not been verified. A decision on a related report applies only to that report.')),
+      panel(
+          'Indicators',
+          Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: (r['indicators'] as Map)
+                  .entries
+                  .map((e) => Text(
+                      '${e.key}: ${(e.value as List).isEmpty ? 'None detected' : (e.value as List).join(', ')}'))
+                  .toList())),
+      panel(
+          'Next step',
+          const Text(
+              'Avoid replying or using message links. Check independently using an organisation’s official app or known contact details.')),
+      OutlinedButton(
+          onPressed: () => run(() async {
+                await history.save(r);
+                notify('Saved on this device.');
+              }),
+          child: const Text('Save analysis')),
+      OutlinedButton(
+          onPressed: () => publish(r['text']),
+          child: const Text('Create redacted report')),
+      FilledButton(
+          onPressed: () {
+            vm.clear();
+            text.clear();
+          },
+          child: const Text('Check another message'))
+    ]);
+  }
+
+  Widget asyncList(
+          Future<List<Json>> future, Widget Function(List<Json>) builder) =>
+      FutureBuilder<List<Json>>(
+          future: future,
+          builder: (c, s) {
+            if (s.hasError)
+              return Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Text('Unable to load: ${s.error}'),
+                TextButton(
+                    onPressed: () => setState(() {}),
+                    child: const Text('Try again'))
+              ]));
+            if (!s.hasData)
+              return const Center(child: CircularProgressIndicator());
+            return builder(s.data!);
+          });
+  Widget feed() => Column(children: [
+        TextField(
+            controller: search,
+            decoration: const InputDecoration(
+                labelText: 'Search reports', prefixIcon: Icon(Icons.search)),
+            onSubmitted: (_) => setState(() {})),
+        const SizedBox(height: 12),
+        Row(children: [
+          const Expanded(
+              child: Text('Community evidence is not verification.')),
+          IconButton(
+              tooltip: 'Refresh',
+              onPressed: () => setState(() {}),
+              icon: const Icon(Icons.refresh)),
+          IconButton(
+              tooltip: 'New report',
+              onPressed: () => publish(''),
+              icon: const Icon(Icons.add))
+        ]),
+        Expanded(
+            child: asyncList(
+                widget.api.reports(query: search.text),
+                (rows) => rows.isEmpty
+                    ? const Center(child: Text('No reports found.'))
+                    : ListView(
+                        children: rows
+                            .map((r) => Card(
+                                child: ListTile(
+                                    title: Text(r['title']),
+                                    subtitle: Text(
+                                        '${r['category']} · ${r['count']} reports\n${r['sample'] == true ? 'Illustrative sample · ' : ''}${r['verification']}'),
+                                    trailing: const Icon(Icons.chevron_right),
+                                    onTap: () => openReport(r['id']))))
+                            .toList())))
+      ]);
+  Widget saved() => asyncList(
+      history.load(),
+      (rows) => rows.isEmpty
+          ? const Center(child: Text('No saved analyses. Saving is optional.'))
+          : ListView(
+              children: rows
+                  .map((r) => Card(
+                      child: ListTile(
+                          title: Text('${r['risk']} risk'),
+                          subtitle: Text(r['text'],
+                              maxLines: 2, overflow: TextOverflow.ellipsis),
+                          onTap: () => setState(() {
+                                vm.result = r;
+                                page = 0;
+                              }),
+                          trailing: IconButton(
+                              tooltip: 'Delete saved analysis',
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () => run(() async {
+                                    await history.delete(r['id']);
+                                  })))))
+                  .toList()));
+  Widget review() {
+    if (widget.api.account?['role'] != 'reviewer')
+      return ListView(children: [
+        panel(
+            'Reviewer access required',
+            const Text(
+                'Only an authorised reviewer can issue a verified decision. An operator must provision this role on the server. Community votes do not grant access.')),
+        FilledButton(onPressed: account, child: const Text('Account'))
+      ]);
+    return asyncList(
+        widget.api.request('/review').then((v) =>
+            (v as List).map((r) => Map<String, dynamic>.from(r)).toList()),
+        (rows) => rows.isEmpty
+            ? const Center(child: Text('No reports awaiting review.'))
+            : ListView(
+                children: rows
+                    .map((r) => Card(
+                        child: ListTile(
+                            title: Text(r['title']),
+                            subtitle: Text(r['text'], maxLines: 3),
+                            onTap: () => reviewReport(r))))
+                    .toList()));
+  }
+
   Future<void> account() async {
-    if(widget.api.account!=null){await showDialog(context:context,builder:(c)=>AlertDialog(title:Text('Signed in as ${widget.api.account!['username']}'),content:Text('Role: ${widget.api.account!['role']}'),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('Close')),TextButton(onPressed:(){Navigator.pop(c);run(()async{await widget.api.signOut();});},child:const Text('Sign out'))]));return;}
-    final u=TextEditingController(),p=TextEditingController();String? error;bool busy=false;
-    await showDialog(context:context,builder:(c)=>StatefulBuilder(builder:(c,update)=>AlertDialog(title:const Text('Community account'),content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[TextField(controller:u,decoration:const InputDecoration(labelText:'Username')),const SizedBox(height:12),TextField(controller:p,obscureText:true,decoration:const InputDecoration(labelText:'Password · 10+ characters')),if(error!=null)Text(error!,style:const TextStyle(color:Colors.red)),if(busy)const LinearProgressIndicator()])),actions:[TextButton(onPressed:busy?null:()=>Navigator.pop(c),child:const Text('Cancel')),...[false,true].map((register)=>TextButton(onPressed:busy?null:()async{update(()=>busy=true);try{await widget.api.signIn(u.text,p.text,register);if(c.mounted)Navigator.pop(c);}catch(e){if(c.mounted)update((){error=e.toString();busy=false;});}},child:Text(register?'Create account':'Sign in')))])));
-    u.dispose();p.dispose();if(mounted)setState((){});
+    if (widget.api.account != null) {
+      await showDialog(
+          context: context,
+          builder: (c) => AlertDialog(
+                  title:
+                      Text('Signed in as ${widget.api.account!['username']}'),
+                  content: Text('Role: ${widget.api.account!['role']}'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(c),
+                        child: const Text('Close')),
+                    TextButton(
+                        onPressed: () {
+                          Navigator.pop(c);
+                          run(() async {
+                            await widget.api.signOut();
+                          });
+                        },
+                        child: const Text('Sign out'))
+                  ]));
+      return;
+    }
+    String username = '', password = ''; // Values owned by this dialog flow.
+    String? error;
+    bool busy = false;
+    await showDialog(
+        context: context,
+        builder: (c) => StatefulBuilder(
+            builder: (c, update) => AlertDialog(
+                    title: const Text('Community account'),
+                    content: SingleChildScrollView(
+                        child:
+                            Column(mainAxisSize: MainAxisSize.min, children: [
+                      TextField(
+                          onChanged: (value) => username = value,
+                          decoration:
+                              const InputDecoration(labelText: 'Username')),
+                      const SizedBox(height: 12),
+                      TextField(
+                          onChanged: (value) => password = value,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                              labelText: 'Password · 10+ characters')),
+                      if (error != null)
+                        Text(error!, style: const TextStyle(color: Colors.red)),
+                      if (busy) const LinearProgressIndicator()
+                    ])),
+                    actions: [
+                      TextButton(
+                          onPressed: busy ? null : () => Navigator.pop(c),
+                          child: const Text('Cancel')),
+                      ...[false, true].map((register) => TextButton(
+                          onPressed: busy
+                              ? null
+                              : () async {
+                                  update(() => busy = true);
+                                  try {
+                                    await widget.api
+                                        .signIn(username, password, register);
+                                    if (c.mounted) Navigator.pop(c);
+                                  } catch (e) {
+                                    if (c.mounted)
+                                      update(() {
+                                        error = e.toString();
+                                        busy = false;
+                                      });
+                                  }
+                                },
+                          child: Text(register ? 'Create account' : 'Sign in')))
+                    ])));
+    if (mounted) setState(() {});
   }
+
   Future<void> openReport(String id) async {
-    try{final r=Map<String,dynamic>.from(await widget.api.request('/reports/$id'));if(!mounted)return;
-      final comment=TextEditingController();
-      await showModalBottomSheet(context:context,isScrollControlled:true,useSafeArea:true,builder:(c)=>Padding(padding:EdgeInsets.fromLTRB(24,24,24,MediaQuery.of(c).viewInsets.bottom+24),child:SizedBox(height:MediaQuery.of(c).size.height*.75,child:ListView(children:[Text(r['title'],style:Theme.of(c).textTheme.titleLarge),const SizedBox(height:12),Text('${r['verification']} · ${r['count']} reports'),const SizedBox(height:16),SelectableText(r['text']),if(r['review']!=null)Text('Reviewer: ${r['review']['reviewer']}\n${r['review']['reason']}\n${r['review']['created']}'),const SizedBox(height:16),Wrap(spacing:8,children:[OutlinedButton(onPressed:()=>run(()async{await widget.api.request('/reports/$id/received',body:{});notify('Receipt recorded once per account.');if(c.mounted)Navigator.pop(c);}),child:const Text('I also received this')),OutlinedButton(onPressed:()=>run(()async{await widget.api.request('/reports/$id/flag',body:{});notify('Sent for review.');}),child:const Text('Request review'))]),const Divider(),const Text('Discussion'),...(r['comments'] as List).map((v)=>ListTile(title:Text(v['text']),subtitle:Text(v['author']))),TextField(controller:comment,maxLength:1000,minLines:2,maxLines:4,decoration:const InputDecoration(labelText:'Comment · no personal details')),FilledButton(onPressed:()=>run(()async{if(comment.text.trim().isEmpty)throw Exception('Enter a comment.');await widget.api.request('/reports/$id/comments',body:{'text':redact(comment.text.trim())});if(c.mounted)Navigator.pop(c);notify('Comment posted. Reopen the report to view it.');}),child:const Text('Post comment'))]))));comment.dispose();
-    }catch(e){notify(e.toString());}
+    try {
+      final r =
+          Map<String, dynamic>.from(await widget.api.request('/reports/$id'));
+      if (!mounted) return;
+      String comment = '';
+      await showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          builder: (c) => Padding(
+              padding: EdgeInsets.fromLTRB(
+                  24, 24, 24, MediaQuery.of(c).viewInsets.bottom + 24),
+              child: SizedBox(
+                  height: MediaQuery.of(c).size.height * .75,
+                  child: ListView(children: [
+                    Text(r['title'], style: Theme.of(c).textTheme.titleLarge),
+                    const SizedBox(height: 12),
+                    Text('${r['verification']} · ${r['count']} reports'),
+                    const SizedBox(height: 16),
+                    SelectableText(r['text']),
+                    if (r['review'] != null)
+                      Text(
+                          'Reviewer: ${r['review']['reviewer']}\n${r['review']['reason']}\n${r['review']['created']}'),
+                    const SizedBox(height: 16),
+                    Wrap(spacing: 8, children: [
+                      OutlinedButton(
+                          onPressed: () => run(() async {
+                                await widget.api
+                                    .request('/reports/$id/received', body: {});
+                                notify('Receipt recorded once per account.');
+                                if (c.mounted) Navigator.pop(c);
+                              }),
+                          child: const Text('I also received this')),
+                      OutlinedButton(
+                          onPressed: () => run(() async {
+                                await widget.api
+                                    .request('/reports/$id/flag', body: {});
+                                notify('Sent for review.');
+                              }),
+                          child: const Text('Request review'))
+                    ]),
+                    const Divider(),
+                    const Text('Discussion'),
+                    ...(r['comments'] as List).map((v) => ListTile(
+                        title: Text(v['text']), subtitle: Text(v['author']))),
+                    TextField(
+                        onChanged: (value) => comment = value,
+                        maxLength: 1000,
+                        minLines: 2,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                            labelText: 'Comment · no personal details')),
+                    FilledButton(
+                        onPressed: () => run(() async {
+                              if (comment.trim().isEmpty)
+                                throw Exception('Enter a comment.');
+                              await widget.api.request('/reports/$id/comments',
+                                  body: {'text': redact(comment.trim())});
+                              if (c.mounted) Navigator.pop(c);
+                              notify(
+                                  'Comment posted. Reopen the report to view it.');
+                            }),
+                        child: const Text('Post comment'))
+                  ]))));
+    } catch (e) {
+      notify(e.toString());
+    }
   }
+
   Future<void> publish(String message) async {
-    if(widget.api.token==null){await account();if(widget.api.token==null)return;}
-    final title=TextEditingController(),body=TextEditingController(text:redact(message));bool consent=false,busy=false;String category='Other';String? error;
-    if(!mounted)return;
-    await showDialog(context:context,builder:(c)=>StatefulBuilder(builder:(c,update)=>AlertDialog(title:const Text('Redacted community report'),content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[const Text('Emails and long numbers are removed automatically. Remove names, addresses, codes and other identifying details yourself.'),const SizedBox(height:12),TextField(controller:title,maxLength:100,decoration:const InputDecoration(labelText:'Title')),DropdownButton<String>(isExpanded:true,value:category,items:['Delivery','Banking','Prize','Other'].map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),onChanged:(v)=>update(()=>category=v!)),TextField(controller:body,minLines:4,maxLines:8,maxLength:10000,decoration:const InputDecoration(labelText:'Redacted message')),CheckboxListTile(title:const Text('I removed personal information.'),value:consent,onChanged:(v)=>update(()=>consent=v??false)),if(error!=null)Text(error!,style:const TextStyle(color:Colors.red)),if(busy)const LinearProgressIndicator()])),actions:[TextButton(onPressed:busy?null:()=>Navigator.pop(c),child:const Text('Cancel')),FilledButton(onPressed:busy?null:()async{if(!consent){update(()=>error='Confirm that personal details have been removed.');return;}update(()=>busy=true);try{await widget.api.request('/reports',body:{'title':title.text,'text':redact(body.text),'category':category,'redaction_confirmed':true});if(c.mounted)Navigator.pop(c);notify('Published as unverified.');}catch(e){if(c.mounted)update((){error=e.toString();busy=false;});}},child:const Text('Publish'))])));
-    title.dispose();body.dispose();if(mounted)setState(()=>page=1);
+    if (widget.api.token == null) {
+      await account();
+      if (widget.api.token == null) return;
+    }
+    String reportTitle = '';
+    String reportBody = redact(message);
+    bool consent = false, busy = false;
+    String category = 'Other';
+    String? error;
+    if (!mounted) return;
+    await showDialog(
+        context: context,
+        builder: (c) => StatefulBuilder(
+            builder: (c, update) => AlertDialog(
+                    title: const Text('Redacted community report'),
+                    content: SingleChildScrollView(
+                        child:
+                            Column(mainAxisSize: MainAxisSize.min, children: [
+                      const Text(
+                          'Emails and long numbers are removed automatically. Remove names, addresses, codes and other identifying details yourself.'),
+                      const SizedBox(height: 12),
+                      TextField(
+                          onChanged: (value) => reportTitle = value,
+                          maxLength: 100,
+                          decoration:
+                              const InputDecoration(labelText: 'Title')),
+                      DropdownButton<String>(
+                          isExpanded: true,
+                          value: category,
+                          items: ['Delivery', 'Banking', 'Prize', 'Other']
+                              .map((v) =>
+                                  DropdownMenuItem(value: v, child: Text(v)))
+                              .toList(),
+                          onChanged: (v) => update(() => category = v!)),
+                      TextFormField(
+                          initialValue: reportBody,
+                          onChanged: (value) => reportBody = value,
+                          minLines: 4,
+                          maxLines: 8,
+                          maxLength: 10000,
+                          decoration: const InputDecoration(
+                              labelText: 'Redacted message')),
+                      CheckboxListTile(
+                          title: const Text('I removed personal information.'),
+                          value: consent,
+                          onChanged: (v) => update(() => consent = v ?? false)),
+                      if (error != null)
+                        Text(error!, style: const TextStyle(color: Colors.red)),
+                      if (busy) const LinearProgressIndicator()
+                    ])),
+                    actions: [
+                      TextButton(
+                          onPressed: busy ? null : () => Navigator.pop(c),
+                          child: const Text('Cancel')),
+                      FilledButton(
+                          onPressed: busy
+                              ? null
+                              : () async {
+                                  if (!consent) {
+                                    update(() => error =
+                                        'Confirm that personal details have been removed.');
+                                    return;
+                                  }
+                                  update(() => busy = true);
+                                  try {
+                                    await widget.api.request('/reports', body: {
+                                      'title': reportTitle,
+                                      'text': redact(reportBody),
+                                      'category': category,
+                                      'redaction_confirmed': true
+                                    });
+                                    if (c.mounted) Navigator.pop(c);
+                                    notify('Published as unverified.');
+                                  } catch (e) {
+                                    if (c.mounted)
+                                      update(() {
+                                        error = e.toString();
+                                        busy = false;
+                                      });
+                                  }
+                                },
+                          child: const Text('Publish'))
+                    ])));
+    if (mounted) setState(() => page = 1);
   }
+
   Future<void> reviewReport(Json r) async {
-    final reason=TextEditingController();String decision='Verified Scam';String? error;bool busy=false;
-    await showDialog(context:context,builder:(c)=>StatefulBuilder(builder:(c,update)=>AlertDialog(title:Text(r['title']),content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[SelectableText(r['text']),DropdownButton<String>(isExpanded:true,value:decision,items:['Verified Scam','Verified Legitimate'].map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),onChanged:(v)=>update(()=>decision=v!)),TextField(controller:reason,minLines:3,maxLines:5,decoration:const InputDecoration(labelText:'Rationale · at least 10 characters')),if(error!=null)Text(error!),if(busy)const LinearProgressIndicator()])),actions:[TextButton(onPressed:busy?null:()=>Navigator.pop(c),child:const Text('Cancel')),FilledButton(onPressed:busy?null:()async{update(()=>busy=true);try{await widget.api.request('/review/${r['id']}',body:{'decision':decision,'reason':reason.text});if(c.mounted)Navigator.pop(c);notify('Decision recorded with reviewer identity and timestamp.');}catch(e){if(c.mounted)update((){error=e.toString();busy=false;});}},child:const Text('Record decision'))])));
-    reason.dispose();if(mounted)setState((){});
+    String reason = '';
+    String decision = 'Verified Scam';
+    String? error;
+    bool busy = false;
+    await showDialog(
+        context: context,
+        builder: (c) => StatefulBuilder(
+            builder: (c, update) => AlertDialog(
+                    title: Text(r['title']),
+                    content: SingleChildScrollView(
+                        child:
+                            Column(mainAxisSize: MainAxisSize.min, children: [
+                      SelectableText(r['text']),
+                      DropdownButton<String>(
+                          isExpanded: true,
+                          value: decision,
+                          items: ['Verified Scam', 'Verified Legitimate']
+                              .map((v) =>
+                                  DropdownMenuItem(value: v, child: Text(v)))
+                              .toList(),
+                          onChanged: (v) => update(() => decision = v!)),
+                      TextField(
+                          onChanged: (value) => reason = value,
+                          minLines: 3,
+                          maxLines: 5,
+                          decoration: const InputDecoration(
+                              labelText: 'Rationale · at least 10 characters')),
+                      if (error != null) Text(error!),
+                      if (busy) const LinearProgressIndicator()
+                    ])),
+                    actions: [
+                      TextButton(
+                          onPressed: busy ? null : () => Navigator.pop(c),
+                          child: const Text('Cancel')),
+                      FilledButton(
+                          onPressed: busy
+                              ? null
+                              : () async {
+                                  update(() => busy = true);
+                                  try {
+                                    await widget.api
+                                        .request('/review/${r['id']}', body: {
+                                      'decision': decision,
+                                      'reason': reason
+                                    });
+                                    if (c.mounted) Navigator.pop(c);
+                                    notify(
+                                        'Decision recorded with reviewer identity and timestamp.');
+                                  } catch (e) {
+                                    if (c.mounted)
+                                      update(() {
+                                        error = e.toString();
+                                        busy = false;
+                                      });
+                                  }
+                                },
+                          child: const Text('Record decision'))
+                    ])));
+    if (mounted) setState(() {});
   }
 }
