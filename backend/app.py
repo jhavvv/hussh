@@ -38,7 +38,7 @@ def setup():
 async def lifespan(app):
     setup()
     yield
-app=FastAPI(title='ScamShield API',version='0.1.0',lifespan=lifespan)
+app=FastAPI(title='huSSh API',version='0.1.0',lifespan=lifespan)
 security=HTTPBearer(auto_error=False)
 # Single-instance protection. Use a distributed limiter before scaling workers.
 rate_buckets={}

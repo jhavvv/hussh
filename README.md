@@ -1,137 +1,281 @@
-# ScamShield
+# huSSh — AI-Assisted Scam Message Detection
 
-A working academic prototype based on the supplied AI Scam Message Detector specification. The package includes a Flutter mobile client, FastAPI API, PostgreSQL configuration, a browser client, synthetic ML baseline, automated backend tests, and requirements mapping.
+huSSh is an academic prototype designed to help users identify potentially suspicious messages through AI-assisted risk analysis, explainable warning indicators, and community reporting.
 
-## What you can use
+The application provides a Flutter Android client, a responsive web interface, and a FastAPI backend. It combines a machine-learning baseline with heuristic detection rules to assess messages and provide supporting evidence.
 
-- **Hosted browser demo:** local message checking, screenshot OCR, optional history, illustrative feed, local posts/comments/receipts. It does not connect to a live community, run the trained Python model, or issue trusted verification.
-- **Full project running locally:** the browser client automatically connects to FastAPI on the same origin. This enables the trained baseline, accounts, shared database-backed reports/comments/receipts, and authorised reviewer decisions.
-- **Flutter source:** mobile flows use the same backend and on-device ML Kit OCR. Android/iOS wrappers are generated with the setup script. No compiled APK/IPA is included. Flutter and native builds were not available in the authoring environment and must be validated on your machine.
+**Important:** huSSh is a prototype, not a validated fraud-detection service. Risk classifications are estimates and should not be treated as definitive evidence that a message is safe or fraudulent.
 
-## Quick start — browser and backend without Docker
+## 1. Key Features
 
-Install Python 3.12 or newer, then open a terminal in this extracted folder:
+### Scam Message Analysis
+- Analyse pasted SMS messages and other suspicious text.
+- Display Low, Medium, or High estimated risk.
+- Provide a risk index from 0–100.
+- Identify warning indicators, including suspicious links, requests for sensitive information, and impersonation patterns.
+- Display relevant historical community reports.
+- Provide safety recommendations.
 
-```sh
-python -m venv .venv
+### Screenshot Text Extraction
+- Select a screenshot containing a message.
+- Extract text locally using Google ML Kit on Android.
+- Allow users to review or edit the extracted text before analysis.
+
+### Community Reporting
+- Publish redacted suspicious-message reports.
+- Browse and search community reports.
+- Post comments and contribute additional context.
+- Indicate that a message was also received.
+- Request a report review.
+
+### Reviewer Verification
+- Restrict report verification to authorised reviewer accounts.
+- Allow reviewers to classify reports as Verified Scam or Verified Legitimate.
+- Require an explanation for each verification decision.
+- Record reviewer identity, decision details, and timestamps.
+
+### Local Analysis History
+- Optionally save analysed messages on the device.
+- Reopen previous results.
+- Delete saved analyses.
+
+## 2. Technologies Used
+
+| Component | Technology |
+|---|---|
+| Mobile application | Flutter and Dart |
+| Web interface | HTML, CSS and JavaScript |
+| Backend API | Python and FastAPI |
+| Database | SQLite (local), with PostgreSQL/Docker configuration |
+| Machine learning | Scikit-learn, TF-IDF and Logistic Regression |
+| Additional detection | Heuristic rules and contextual indicators |
+| Screenshot OCR | Google ML Kit Text Recognition |
+| Authentication | Token-based sessions and password hashing |
+| Version control | Git and GitHub |
+
+## 3. Project Structure
+
+```text
+hussh/
+├── backend/
+│   ├── app.py
+│   ├── intelligence.py
+│   ├── requirements.txt
+│   └── ...
+├── mobile/
+│   ├── android/
+│   ├── assets/
+│   │   └── images/
+│   │       └── hussh_logo.png
+│   ├── lib/
+│   │   ├── main.dart
+│   │   ├── repositories.dart
+│   │   └── view_model.dart
+│   └── pubspec.yaml
+├── web/
+│   ├── index.html
+│   ├── app.js
+│   ├── style.css
+│   └── ...
+├── docs/
+├── test cases/
+└── README.md
 ```
 
-Activate it on Windows PowerShell:
+## 4. Running the Backend
+
+### Requirements
+
+- Python 3.12 or newer, compatible with the listed dependencies
+- Internet access for initial package installation
+
+From the project root, create and activate a virtual environment:
 
 ```powershell
+python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
-Or on macOS/Linux:
+Install backend dependencies:
 
-```sh
-source .venv/bin/activate
-```
-
-Then:
-
-```sh
+```powershell
 python -m pip install -r backend/requirements.txt
+```
+
+Start the FastAPI backend:
+
+```powershell
 cd backend
-python -m uvicorn app:app --reload --host 127.0.0.1 --port 8000 --no-access-log
+python -m uvicorn app:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Open **http://127.0.0.1:8000**. The top-right badge should say **Backend connected**. API documentation is at **http://127.0.0.1:8000/docs**. The simple path uses SQLite, creating `backend/scamshield.db`. It has the same API and SQLAlchemy models as the PostgreSQL configuration below.
+The application should be available at:
 
-## PostgreSQL version with Docker
+- Web interface: http://127.0.0.1:8000
+- API documentation: http://127.0.0.1:8000/docs
+- API health endpoint: http://127.0.0.1:8000/api/health
 
-From the project root, copy `.env.example` to `.env` and replace the sample password with a random alphanumeric password. Docker Desktop must be installed and running.
+The default local configuration uses SQLite. The database is created automatically during backend startup.
 
-```sh
-docker compose up --build
+## 5. Running the Flutter Android Application
+
+### Requirements
+
+- Flutter SDK
+- Android Studio and Android SDK
+- Android emulator or compatible Android device
+
+The Android project files are included in the repository.
+
+From the `mobile` directory:
+
+```powershell
+flutter pub get
+flutter doctor
+flutter devices
 ```
 
-Open **http://127.0.0.1:8000**. PostgreSQL keeps its records in a Docker volume. The database port is not exposed. The web port is bound to loopback. This is a local development setup; use TLS and appropriate proxy limits before remote deployment.
+With the Android emulator running, launch the app:
 
-## Try the full flow
-
-1. Open the app and choose the Banking sample. Analyse it and inspect four separate evidence panels.
-2. Save an analysis, open History, reopen it, then delete it.
-3. Click the account control and create a username/password. Passwords require 10 characters. No email or password-reset flow is included.
-4. Publish a report after redacting names, contact details, addresses and codes. The server also removes email addresses and long numbers.
-5. Open that report, comment, and mark it received. Receipts are unique per authenticated account and report. The creator's receipt is already counted.
-6. Request review. The report enters the reviewer queue.
-7. Create a separate reviewer account through the same registration flow, then provision it using the operator command below. Registration can never self-assign a reviewer role.
-8. Sign in again with the reviewer account, open Trusted review, and record a decision with a rationale. The server writes the decision and audit record in one transaction.
-
-For local Python setup, in `backend/`:
-
-```sh
-python manage.py promote-reviewer your_reviewer_username
+```powershell
+flutter run -d emulator-5554
 ```
 
-For Docker, from the root:
+Replace `emulator-5554` if your device has a different identifier.
 
-```sh
-docker compose exec api python manage.py promote-reviewer your_reviewer_username
+The Android emulator accesses the local FastAPI server using:
+
+```text
+http://10.0.2.2:8000/api
 ```
 
-Use `revoke-reviewer` instead of `promote-reviewer` to remove the role. Do not expose this operator command through a public HTTP endpoint.
+Keep the FastAPI server running while testing features that require the backend.
 
-## Flutter mobile client
+## 6. Running the Web Application
 
-Install Flutter stable, an Android SDK/emulator, and (for iOS) macOS with Xcode and CocoaPods. From the project root:
+Start the backend as described above, then open:
 
-```sh
-python scripts/setup_mobile.py
-cd mobile
-flutter analyze
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api
-```
+http://127.0.0.1:8000
 
-`10.0.2.2` connects an Android emulator to the host machine's localhost. Android debug builds allow HTTP for this local development path; release builds do not. The supplied script sets Android minSdk 23, iOS minimum 15.5, internet access, and the photo-library purpose string. Resolve any newer Flutter/plugin platform constraints reported by your installed SDK before building.
+When served through FastAPI, the web client can access the backend's analysis, account, community reporting and review features.
 
-For an iPhone/iOS simulator or physical Android device, provide an **HTTPS** backend URL reachable by that device:
+The browser-only demonstration has different capabilities and persistence behaviour from the backend-connected application.
 
-```sh
-flutter run --dart-define=API_BASE_URL=https://your-backend.example/api
-```
+## 7. Authentication and Reviewer Access
 
-The example host is a placeholder, not a deployed service. Do not enter it unchanged. The local Docker API is deliberately not reachable from other devices without a separate secure deployment. Native OCR is Android/iOS only, not Flutter Web. The independent `web/` client uses browser OCR.
+Users can create community accounts through the application.
 
-### Architecture
+New accounts receive the `user` role by default.
 
-- `mobile/lib/repositories.dart`: interfaces for OCR, classifier, intelligence and history; HTTP, ML Kit, local history and secure session implementations.
-- `mobile/lib/view_model.dart`: `AnalyzeMessageUseCase` and `SubmitMessageViewModel`; views do not invoke OCR/model logic directly.
-- `mobile/lib/main.dart`: check/result, community, history, account, report detail and trusted review views.
-- `backend/intelligence.py`: separate indicator extraction, redaction, synthetic-trained classifier and historical matching.
-- `backend/app.py`: persistence, authentication, validation, community endpoints and role-enforced verification with audit records.
-- `web/`: responsive browser client; automatically detects a backend when served by FastAPI.
+The backend also supports a `reviewer` role. Reviewer privileges must be assigned by an authorised operator through the backend environment; ordinary account registration cannot grant reviewer permissions.
 
-The prototype combines verification orchestration into backend service functions; it does not yet implement every named class from the conceptual UML as a separate class. Matching uses exact URLs and token overlap; it is not a live blacklist or embedding search. Report listing and matching are capped at 200 recent records and need pagination/indexing for larger datasets.
+Reviewer accounts can access the Review tab, inspect flagged reports, record verification decisions, and provide supporting rationales.
 
-## Tests and evaluation
+Verification decisions are recorded with the reviewer's identity and timestamp.
 
-From `backend/`:
+## 8. Scam Detection Approach
 
-```sh
+huSSh uses a hybrid prototype approach combining:
+
+1. TF-IDF text feature extraction.
+2. Logistic Regression trained on synthetic scam and legitimate-message examples.
+3. Heuristic rules for suspicious language and behaviour.
+4. Contextual checks for requests involving credentials, money and impersonation.
+5. URL extraction and selected known-brand domain comparisons.
+6. Historical report matching using URLs and text similarity.
+
+The detection logic considers categories such as delivery, banking, government impersonation, recruitment, prize scams, account security, and personal impersonation.
+
+The displayed risk index is a heuristic measure, not a calibrated probability.
+
+## 9. Functional Testing
+
+The application has undergone manual testing using an Android emulator, alongside targeted backend classifier checks.
+
+Testing included:
+
+- Suspicious NZ Post delivery messages.
+- Legitimate delivery notifications.
+- Banking phishing and legitimate banking notifications.
+- Government impersonation and legitimate IRD notifications.
+- Job scams and legitimate recruitment messages.
+- Screenshot OCR and subsequent message analysis.
+- Saving and deleting analysis history.
+- Community comments.
+- Reviewer account access and verification decisions.
+
+### Selected observed results
+
+| Test case | Observed classification | Risk index |
+|---|---|---|
+| NZ Post phishing — improved detector | High | 74/100 |
+| Legitimate NZ Post delivery | Low | 14/100 |
+| Kiwibank phishing — improved detector | High | 85/100 |
+| Legitimate Kiwibank notification — improved detector | Low | 12/100 |
+| IRD phishing | High | 70/100 |
+| Legitimate IRD notification | Low | 14/100 |
+| Job scam involving an upfront deposit | Medium | 54/100 |
+| Legitimate job interview message | Low | 12/100 |
+
+Testing revealed classification weaknesses, including false positives in legitimate banking notifications and underestimated risk in certain phishing and job-scam messages.
+
+Targeted changes improved the banking and delivery examples. The job-scam result remains a documented limitation.
+
+These are selected development and regression tests, not an independent estimate of overall detection accuracy. Additional unseen-message evaluation is needed.
+
+### Backend Tests
+
+The repository also contains backend automated testing and evaluation scripts.
+
+From the `backend` directory:
+
+```powershell
 python -m pytest -q
 python evaluate.py
 ```
 
-The backend suite passed **16 tests** in this environment. Tests cover input validation, classification response, indicators, missing matches, redaction, authenticated reporting, role injection, unique receipts, comments, reviewer controls/audit, evidence precedence, no analysis retention, service failures and logout. Tested with SQLite; PostgreSQL integration and native device tests are pending.
+Run these commands to verify the current test results. Earlier test counts should not be assumed to remain unchanged after classifier modifications.
 
-`docs/evaluation.json` records a tiny synthetic holdout evaluation and local classification latency. These scores are only a smoke test. Do not report them as evidence of real-world accuracy. The <=5-second network target, OCR correctness on devices and usability targets have not been measured. See `docs/REQUIREMENTS.md` for the full acceptance status.
+## 10. Privacy and Security
 
-## Privacy and limitations
+The prototype includes several privacy and security mechanisms:
 
-Screenshots are never accepted by the backend; clients extract text on-device. The selected image remains in your photo library, while the Flutter picker cache copy is removed after extraction. Browser OCR downloads Tesseract software/language assets from a CDN and may fail when offline or blocked. Extracted text remains editable until you explicitly analyse it.
+- Screenshot text recognition is performed on the device.
+- Users can review extracted text before submitting it.
+- Analysis history is optional and stored locally.
+- Analysis submissions are not intentionally persisted by the analysis endpoint.
+- Community reports and comments are stored separately and undergo pattern-based redaction.
+- Passwords are salted and hashed.
+- Authentication sessions use tokens.
+- Reviewer-only operations are protected by server-side role checks.
+- Verification decisions are recorded for accountability.
 
-The analysis endpoint does not persist submitted text. History is opt-in and device-local, not cloud-synced or encrypted by the app; use only redacted content on shared devices. Public reports/comments are intentionally persistent and redacted; review personal details manually because pattern-based redaction cannot find everything. Raw image evidence is not published: report evidence consists of redacted text and detected indicators.
+Pattern-based redaction cannot reliably remove all personal information. Users should review their text before publishing reports.
 
-The backend model is trained on 32 synthetic messages at startup. It is a replaceable baseline, not a production detector. It uses TF-IDF/logistic regression plus heuristic cues. Its risk index is not a calibrated probability. Rule cues explain the heuristic component, not individual learned model coefficients. High community counts never change verification. A verified similar report does not verify a newly submitted message.
+## 11. Limitations and Future Improvements
 
-Passwords are salted with PBKDF2-SHA256 (600,000 iterations). Tokens are random, stored hashed server-side, expire after 24 hours, and are revocable by logout. Flutter stores tokens in secure storage; the browser keeps tokens in memory. Account creation/login has a per-process limiter. Add distributed limits, migration management, abuse moderation, account recovery, monitoring, backups and independent security testing before wider use. Multiple fake accounts remain a risk; unique-per-account does not mean unique-per-person.
+huSSh remains an academic prototype with several limitations:
 
-## Primary implementation references
+- The machine-learning component uses a small synthetic training dataset.
+- Detection may produce false positives or fail to recognise unfamiliar scams.
+- Risk scores are not calibrated probabilities.
+- Some legitimate and unrelated community reports may be incorrectly matched by text similarity.
+- Reviewer decisions apply to specific reports, not automatically to similar messages.
+- Community reports are not independently verified when initially submitted.
+- Account recovery, production-scale monitoring and advanced abuse prevention are not implemented.
+- The system has not undergone independent real-world security or classification validation.
+
+Future improvements could include larger independently labelled datasets, additional model evaluation, improved semantic context handling, better similarity matching, broader device testing and more comprehensive automated tests.
+
+## 12. Implementation References
 
 - Flutter: https://docs.flutter.dev/
-- ML Kit Flutter plugin: https://pub.dev/packages/google_mlkit_text_recognition
-- Image picker: https://pub.dev/packages/image_picker
-- FastAPI authentication: https://fastapi.tiangolo.com/reference/security/
-- FastAPI tests: https://fastapi.tiangolo.com/tutorial/testing/
+- FastAPI: https://fastapi.tiangolo.com/
+- Scikit-learn: https://scikit-learn.org/
+- Google ML Kit Text Recognition: https://pub.dev/packages/google_mlkit_text_recognition
+- Flutter Image Picker: https://pub.dev/packages/image_picker
+
+---
+
+**Project:** huSSh — AI-Assisted Scam Message Detection  
+**Purpose:** Academic prototype for COMP826 Mobile Systems Development
